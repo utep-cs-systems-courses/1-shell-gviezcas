@@ -8,6 +8,7 @@ fdIn = 0
 fdOut = 1
 fdError = 2
 currentDir = os.getcwd()
+toPipeFd, fromPipeFd = os.pipe()
 
 while runProgram:
     os.write(fdOut, ("%s\n" % currentDir).encode())
@@ -29,7 +30,6 @@ while runProgram:
             os.write(fdOut, "Please enter a command.\n".encode())
             continue
         elif command[0].lower() == "exit":
-            runProgram = 0
             os.write(fdOut, "Exiting...\n".encode())
             sys.exit(1)
         elif command[0].lower() == "cd":
@@ -45,14 +45,21 @@ while runProgram:
                 os.close(fdOut)
                 os.open(command[2], os.O_CREAT | os.O_WRONLY)
                 os.set_inheritable(1, True)
-                os.system(command[0])
+                for dir in re.split(":", os.environ['PATH']):
+                    program = "%s/%s" % (dir, command[0])
+                    try:
+                        os.execve(program, [command[0], ], os.environ)
+                    except FileNotFoundError:
+                        pass
+                os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
                 sys.exit(0)
+           # elif command[1] == "|":
         else:
             for dir in re.split(":", os.environ['PATH']):
                 program = "%s/%s" % (dir, command[0])
                 try:
-                    os.execve(program, command, os.environ)
-                except:
+                    os.execve(program, [command[0], ], os.environ)
+                except FileNotFoundError:
                     pass
             os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
             sys.exit(0)
