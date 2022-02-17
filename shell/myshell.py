@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import os, sys, re, stat
+import os, sys, re
 
 os.environ['PS1'] = '<#> '
 runProgram = 1
@@ -8,7 +8,6 @@ fdIn = 0
 fdOut = 1
 fdError = 2
 currentDir = os.getcwd()
-toPipeFd, fromPipeFd = os.pipe()
 
 while runProgram:
     os.write(fdOut, ("%s\n" % currentDir).encode())
@@ -53,7 +52,29 @@ while runProgram:
                         pass
                 os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
                 sys.exit(0)
-           # elif command[1] == "|":
+            elif command[1] == "|":
+                pr, pw = os.pipe()
+                secondFork = os.fork()
+                if secondFork < 0:
+                    os.write(fdOut, "Fork failed..")
+                    sys.exit(1)
+                elif secondFork: #parent
+                    os.close(fdIn)
+                    os.dup(pr)
+                    for fd in (pr, pw):
+                        os.close(fd)
+                    os.read(pr, sys.getsizeof(pr))
+                else: #child
+                    os.close(fdOut)
+                    os.dup(pw)
+                    for fd in (pr, pw):
+                        os.close(fd)
+                    for dir in re.split(":", os.environ['PATH']):
+                        program = "%s/%s" % (dir, command[0])
+                        try:
+                            os.execve(program, [command[0], ], os.environ)
+                        except FileNotFoundError:
+                            pass
         else:
             for dir in re.split(":", os.environ['PATH']):
                 program = "%s/%s" % (dir, command[0])
