@@ -9,6 +9,14 @@ fdOut = 1
 fdError = 2
 currentDir = os.getcwd()
 
+def execCommand(command):
+    for dir in re.split(":", os.environ['PATH']):
+        program = "%s/%s" % (dir, command)
+        try:
+            os.execve(program, [command, ], os.environ)
+        except FileNotFoundError:
+            pass
+
 while runProgram:
     os.write(fdOut, ("%s\n" % currentDir).encode())
     os.write(fdOut, os.environ['PS1'].encode())
@@ -41,12 +49,7 @@ while runProgram:
                     os.write(fdOut, ("Invalid path: %s\n" % command[1]).encode())
                     continue
             else:
-                for dir in re.split(":", os.environ['PATH']):
-                    program = "%s/%s" % (dir, command[0])
-                    try:
-                        os.execve(program, [command[0], ], os.environ)
-                    except:
-                        pass
+                execCommand(command[0])
                 os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
                 sys.exit(0)
         elif len(command) > 1:
@@ -54,12 +57,7 @@ while runProgram:
                 os.close(fdOut)
                 os.open(command[2], os.O_CREAT | os.O_WRONLY)
                 os.set_inheritable(1, True)
-                for dir in re.split(":", os.environ['PATH']):
-                    program = "%s/%s" % (dir, command[0])
-                    try:
-                        os.execve(program, [command[0], ], os.environ)
-                    except FileNotFoundError:
-                        pass
+                execCommand(command[0]) 
                 os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
                 sys.exit(0)
             elif command[1] == "|":
@@ -73,22 +71,15 @@ while runProgram:
                 elif secondFork: #second parent
                     os.wait()
                     os.close(fdIn)
-                    r = os.fdopen(pr)
-                    output = r.read()
-                    print(output)
+                    os.dup2(pr, fdIn)
                     for fd in (pr, pw):
                         os.close(fd)
+                    execCommand(command[2])
                     sys.exit(0)
                 else: #second child
-                    print("Pass here.....child2....")
                     os.close(fdOut)
-                    os.dup(pw)
+                    os.dup2(pw, fdOut)
                     for fd in (pr, pw):
                         os.close(fd)
-                    for dir in re.split(":", os.environ['PATH']):
-                        program = "%s/%s" % (dir, command[0])
-                        try:
-                            os.execve(program, [command[0], ], os.environ)
-                        except FileNotFoundError:
-                            pass
+                    execCommand(command[0])
                     sys.exit(0)
