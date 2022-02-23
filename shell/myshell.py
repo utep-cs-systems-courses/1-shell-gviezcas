@@ -28,17 +28,27 @@ while runProgram:
         if len(command) == 0:
             os.write(fdOut, "Please enter a command.\n".encode())
             continue
-        elif command[0].lower() == "exit":
-            os.write(fdOut, "Exiting...\n".encode())
-            sys.exit(1)
-        elif command[0].lower() == "cd":
-            if os.path.exists(command[1]):
-                os.chdir(command[1])
-                currentDir = os.getcwd()
-                continue
+        if len(command) == 1:
+            if command[0].lower() == "exit":
+                os.write(fdOut, "Exiting...\n".encode())
+                sys.exit(1)
+            elif command[0].lower() == "cd":
+                if os.path.exists(command[1]):
+                    os.chdir(command[1])
+                    currentDir = os.getcwd()
+                    continue
+                else:
+                    os.write(fdOut, ("Invalid path: %s\n" % command[1]).encode())
+                    continue
             else:
-                os.write(fdOut, ("Invalid path: %s\n" % command[1]).encode())
-                continue
+                for dir in re.split(":", os.environ['PATH']):
+                    program = "%s/%s" % (dir, command[0])
+                    try:
+                        os.execve(program, [command[0], ], os.environ)
+                    except:
+                        pass
+                os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
+                sys.exit(0)
         elif len(command) > 1:
             if command[1] == ">":
                 os.close(fdOut)
@@ -54,17 +64,23 @@ while runProgram:
                 sys.exit(0)
             elif command[1] == "|":
                 pr, pw = os.pipe()
+                for f in (pr, pw):
+                    os.set_inheritable(f, True)
                 secondFork = os.fork()
                 if secondFork < 0:
                     os.write(fdOut, "Fork failed..")
                     sys.exit(1)
-                elif secondFork: #parent
+                elif secondFork: #second parent
+                    os.wait()
                     os.close(fdIn)
-                    os.dup(pr)
+                    r = os.fdopen(pr)
+                    output = r.read()
+                    print(output)
                     for fd in (pr, pw):
                         os.close(fd)
-                    os.read(pr, sys.getsizeof(pr))
-                else: #child
+                    sys.exit(0)
+                else: #second child
+                    print("Pass here.....child2....")
                     os.close(fdOut)
                     os.dup(pw)
                     for fd in (pr, pw):
@@ -75,12 +91,4 @@ while runProgram:
                             os.execve(program, [command[0], ], os.environ)
                         except FileNotFoundError:
                             pass
-        else:
-            for dir in re.split(":", os.environ['PATH']):
-                program = "%s/%s" % (dir, command[0])
-                try:
-                    os.execve(program, [command[0], ], os.environ)
-                except FileNotFoundError:
-                    pass
-            os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
-            sys.exit(0)
+                    sys.exit(0)
