@@ -40,7 +40,12 @@ while runProgram:
             if command[0].lower() == "exit":
                 os.write(fdOut, "Exiting...\n".encode())
                 sys.exit(1)
-            elif command[0].lower() == "cd":
+            else:
+                execCommand(command[0])
+                os.write("%s: Command not found.\n" % command[1]).encode()
+                sys.exit(0)
+        elif len(command) > 1:
+            if command[0].lower() == "cd":
                 if os.path.exists(command[1]):
                     os.chdir(command[1])
                     currentDir = os.getcwd()
@@ -48,12 +53,7 @@ while runProgram:
                 else:
                     os.write(fdOut, ("Invalid path: %s\n" % command[1]).encode())
                     continue
-            else:
-                execCommand(command[0])
-                os.write(fdOut, ("%s: Command not found.\n" % command[0]).encode())
-                sys.exit(0)
-        elif len(command) > 1:
-            if command[1] == ">":
+            elif command[1] == ">":
                 os.close(fdOut)
                 os.open(command[2], os.O_CREAT | os.O_WRONLY)
                 os.set_inheritable(1, True)
